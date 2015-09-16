@@ -97,6 +97,7 @@ def main():
             name=dict(required=True),
             state=dict(default="present", choices=["absent", "present", "started", "stopped", "restarted"]),
             disk_size_gb=dict(),
+            sync=dict(choices=BOOLEANS, type='bool', default=False),
             oci_class=dict(),
             origin_oci=dict(),
             template_id=dict(),
@@ -111,6 +112,8 @@ def main():
     name = module.params.get('name')
     state = module.params.get('state')
     disk_size_gb = module.params.get('disk_size_gb')
+    sync = module.params.get('sync')
+
     if disk_size_gb is not None:
         disk_size_gb = int(disk_size_gb)
     oci_class = module.params.get('oci_class')
@@ -166,6 +169,12 @@ def main():
         if state == 'absent':
             if not module.check_mode:
                 api.OCI_Delete(oci['id'])
+                if sync:
+                    while True:
+                        is_requested_OCI = map(lambda vm: vm['id'] == oci['id'] and not vm['status'] == PowerStatus.PowerOff, api.OCI_List())
+                        if not any(is_requested_OCI):
+                            break
+                        time.sleep(15)
             module_ret['changed'] = True
             module.exit_json(**module_ret)
 
